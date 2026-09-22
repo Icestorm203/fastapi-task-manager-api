@@ -50,6 +50,10 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Create database tables
+        run: |
+          python -c "from app.database import Base, engine; from app import models; Base.metadata.create_all(bind=engine)"
+
       - name: Run tests
         run: |
           pytest
