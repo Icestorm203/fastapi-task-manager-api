@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from pydantic import ConfigDict
 
 class TaskCreate(BaseModel):
     title: str
@@ -10,5 +10,6 @@ class TaskResponse(BaseModel):
     title: str
     is_closed: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True
+    )

@@ -1,49 +1,108 @@
 # Task Manager API
 
-Небольшой REST API для управления задачами на FastAPI. Проект поддерживает создание, просмотр, закрытие и удаление задач. Данные хранятся в PostgreSQL через SQLAlchemy.
+Небольшой REST API для управления задачами на FastAPI.
+
+Проект поддерживает создание, просмотр, закрытие и удаление задач. Данные хранятся в PostgreSQL через SQLAlchemy. Для проверки API используются автоматические тесты на Pytest.
 
 ## Возможности
 
-- получить список задач;
-- создать задачу;
-- закрыть задачу;
-- удалить задачу;
-- автоматически открыть интерактивную документацию Swagger и ReDoc.
+- получение списка задач;
+- создание новых задач;
+- закрытие существующих задач;
+- удаление задач;
+- автоматическая валидация данных через Pydantic;
+- интерактивная документация Swagger UI и ReDoc;
+- интеграционные тесты API через Pytest;
+- запуск приложения и базы данных через Docker Compose.
 
 ## Стек
 
-- Python 3.10+
+- Python 3.12
 - FastAPI
 - Uvicorn
-- SQLAlchemy
 - PostgreSQL
+- SQLAlchemy
+- Pydantic
 - Pytest
+- Docker
+- Docker Compose
 
 ## Структура проекта
 
 ```text
 app/
+├── __init__.py
 ├── main.py              # точка входа FastAPI
 ├── database.py          # подключение к PostgreSQL
 ├── models.py            # SQLAlchemy-модели
 ├── schemas.py           # Pydantic-схемы
-├── crud.py              # операции с задачами
+├── crud.py              # операции с БД
 └── routers/
-		└── tasks.py         # endpoints задач
+    ├── __init__.py
+    └── tasks.py         # маршруты API
+
 tests/
 └── test_tasks.py        # тесты API
+
+Dockerfile
+docker-compose.yml
+pytest.ini
+requirements.txt
+README.md
 ```
 
-## Установка
+## API Endpoints
 
-Клонируйте репозиторий и перейдите в его директорию:
+| Метод | Endpoint | Описание |
+|---------|---------|---------|
+| GET | `/tasks` | Получить все задачи |
+| POST | `/tasks` | Создать задачу |
+| PUT | `/tasks/{task_id}` | Закрыть задачу |
+| DELETE | `/tasks/{task_id}` | Удалить задачу |
+
+Все endpoints доступны через Swagger:
+```text
+http://localhost:8000/docs
+```
+
+## Запуск через Docker
+
+Собрать и запустить контейнеры:
+
+```bash
+docker compose up --build
+```
+
+После запуска будут доступны:
+
+```text
+API:
+http://localhost:8000
+
+Swagger UI:
+http://localhost:8000/docs
+
+ReDoc:
+http://localhost:8000/redoc
+```
+
+Остановить контейнеры:
+
+```bash
+docker compose down
+```
+
+## Локальный запуск
+
+Клонировать репозиторий:
 
 ```bash
 git clone https://github.com/<your-username>/fastapi-task-manager-api.git
+
 cd fastapi-task-manager-api
 ```
 
-Создайте виртуальное окружение и установите зависимости:
+Создать виртуальное окружение:
 
 ```bash
 python -m venv .venv
@@ -61,48 +120,31 @@ Linux/macOS:
 source .venv/bin/activate
 ```
 
+Установить зависимости:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-## Настройка PostgreSQL
-
-Создайте базу данных `fastapi_tasks` в PostgreSQL. Текущая конфигурация приложения ожидает следующие параметры:
+Создать базу данных PostgreSQL:
 
 ```text
-Хост: localhost
-Порт: 5432
-Пользователь: postgres
-Пароль: postgres
-База данных: fastapi_tasks
+Database: fastapi_tasks
+User: postgres
+Password: postgres
+Host: localhost
+Port: 5432
 ```
 
-Например, командой `createdb`:
-
-```bash
-createdb -U postgres fastapi_tasks
-```
-
-Таблица `tasks` создаётся автоматически при запуске приложения. Если параметры подключения отличаются, измените `DATABASE_URL` в `app/database.py`.
-
-## Запуск
-
-Запустите сервер разработки:
+Запустить приложение:
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-После запуска API будет доступен по адресу `http://127.0.0.1:8000`.
+## Примеры запросов
 
-Интерактивная документация:
-
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
-
-## API
-
-### Получить все задачи
+### Получить список задач
 
 ```http
 GET /tasks
@@ -112,11 +154,11 @@ GET /tasks
 
 ```json
 [
-	{
-		"id": 1,
-		"title": "Изучить FastAPI",
-		"is_closed": false
-	}
+  {
+    "id": 1,
+    "title": "Изучить FastAPI",
+    "is_closed": false
+  }
 ]
 ```
 
@@ -131,42 +173,91 @@ Content-Type: application/json
 
 ```json
 {
-	"title": "Изучить FastAPI"
+  "title": "Изучить FastAPI"
 }
 ```
 
-Новая задача создаётся с `is_closed: false`.
+Ответ:
+
+```json
+{
+  "id": 1,
+  "title": "Изучить FastAPI",
+  "is_closed": false
+}
+```
 
 ### Закрыть задачу
 
 ```http
-PUT /tasks/{task_id}
+PUT /tasks/1
 ```
 
-После успешного запроса поле `is_closed` становится `true`. Если задача не найдена, API возвращает `404 Not Found`.
+Ответ:
+
+```json
+{
+  "id": 1,
+  "title": "Изучить FastAPI",
+  "is_closed": true
+}
+```
 
 ### Удалить задачу
 
 ```http
-DELETE /tasks/{task_id}
+DELETE /tasks/1
 ```
 
-Успешный ответ:
+Ответ:
 
 ```json
 {
-	"message": "Task deleted"
+  "message": "Task deleted"
 }
 ```
 
-Если задача не найдена, API возвращает `404 Not Found`.
-
 ## Тестирование
 
-Запустите тесты из корневой директории проекта:
+Запуск тестов:
 
 ```bash
 pytest
 ```
 
-Тесты используют то же подключение к PostgreSQL, что и приложение, поэтому перед запуском убедитесь, что база данных доступна.
+Текущий набор тестов проверяет:
+
+- получение списка задач;
+- создание задачи;
+- закрытие задачи;
+- удаление задачи;
+- закрытие несуществующей задачи;
+- удаление несуществующей задачи;
+- валидацию пустого запроса.
+
+Пример результата:
+
+```text
+collected 7 items
+
+tests/test_tasks.py .......
+
+7 passed
+```
+
+## Полученные навыки
+
+- разработка REST API на FastAPI;
+- работа с PostgreSQL через SQLAlchemy ORM;
+- контейнеризация приложения с Docker;
+- настройка Docker Compose;
+- тестирование API через Pytest;
+- работа со Swagger/OpenAPI;
+- организация проекта через routers, schemas и CRUD слой.
+
+
+## Автор
+
+Мустафа Муратов
+
+Pet-проект для изучения Python Backend Development.

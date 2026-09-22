@@ -3,8 +3,9 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = (
-    "postgresql://postgres:postgres@localhost:5432/fastapi_tasks"
+    "postgresql://postgres:postgres@db:5432/fastapi_tasks"
 )
+
 
 engine = create_engine(DATABASE_URL)
 
