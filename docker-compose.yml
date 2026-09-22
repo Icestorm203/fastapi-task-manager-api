@@ -21,6 +21,9 @@ services:
 
     container_name: fastapi_api
 
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/fastapi_tasks
+      
     ports:
       - "8000:8000"
 
