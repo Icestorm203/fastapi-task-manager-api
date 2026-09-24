@@ -1,16 +1,17 @@
 from .models import Task
 
 
-def get_tasks(db):
+def get_tasks(db, current_user):
 
-    return db.query(Task).all()
+    return db.query(Task).filter(Task.user_id == current_user.id).all()
 
 
-def create_task(db, task_data):
+def create_task(db, task_data, current_user):
 
     task = Task(
         title=task_data.title,
-        is_closed=False
+        is_closed=False,
+        user_id=current_user.id
     )
 
     db.add(task)
@@ -22,10 +23,11 @@ def create_task(db, task_data):
     return task
 
 
-def close_task(db, task_id):
+def close_task(db, task_id, current_user):
 
     task = db.query(Task).filter(
-        Task.id == task_id
+        Task.id == task_id,
+        Task.user_id == current_user.id
     ).first()
 
     if task:
@@ -39,10 +41,11 @@ def close_task(db, task_id):
     return task
 
 
-def delete_task(db, task_id):
+def delete_task(db, task_id, current_user):
 
     task = db.query(Task).filter(
-        Task.id == task_id
+        Task.id == task_id,
+        Task.user_id == current_user.id
     ).first()
 
     if task:

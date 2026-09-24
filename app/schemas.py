@@ -13,3 +13,17 @@ class TaskResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+
+class UserCreate(BaseModel):
+
+    username: str
+
+    password: str
+
+
+class UserLogin(BaseModel):
+
+    username: str
+
+    password: str
