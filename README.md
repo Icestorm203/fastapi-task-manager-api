@@ -2,20 +2,26 @@
 
 REST API для управления задачами на FastAPI.
 
-Проект позволяет создавать, просматривать, закрывать и удалять задачи. Данные хранятся в PostgreSQL через SQLAlchemy ORM. Для проверки работоспособности API используются автоматические тесты на Pytest. Проект контейнеризирован с помощью Docker и имеет настроенный CI через GitHub Actions.
+Проект позволяет регистрировать пользователей, выполнять аутентификацию через JWT, создавать и управлять личными задачами. Данные хранятся в PostgreSQL через SQLAlchemy ORM. Для управления схемой базы данных используются миграции Alembic. Для проверки работоспособности API используются автоматические тесты на Pytest. Проект контейнеризирован с помощью Docker и имеет настроенный CI через GitHub Actions.
 
 ---
 
 ## Возможности
 
-- получение списка задач;
+- регистрация пользователей;
+- аутентификация через JWT;
+- авторизация защищённых маршрутов;
+- получение списка собственных задач;
 - создание новых задач;
 - закрытие существующих задач;
 - удаление задач;
+- изоляция задач между пользователями;
 - валидация входных данных через Pydantic;
+- миграции базы данных через Alembic;
 - автоматическая генерация Swagger/OpenAPI документации;
 - интеграционные тесты через Pytest;
 - запуск приложения и базы данных через Docker Compose;
+- healthcheck PostgreSQL для корректного запуска контейнеров;
 - автоматический запуск тестов через GitHub Actions (CI).
 
 ---
@@ -27,11 +33,28 @@ REST API для управления задачами на FastAPI.
 - Uvicorn
 - PostgreSQL
 - SQLAlchemy
+- Psycopg2
+- Alembic
 - Pydantic
+- python-jose (JWT)
+- Passlib
 - Pytest
 - Docker
 - Docker Compose
 - GitHub Actions
+
+---
+
+## Архитектура
+
+Проект организован по слоям:
+
+- `routers` — HTTP endpoints;
+- `schemas` — модели запросов и ответов;
+- `crud` — работа с базой данных;
+- `models` — SQLAlchemy модели;
+- `auth` — JWT-аутентификация и авторизация;
+- `database` — подключение к PostgreSQL.
 
 ---
 
@@ -40,24 +63,32 @@ REST API для управления задачами на FastAPI.
 ```text
 app/
 ├── __init__.py
-├── main.py              # точка входа FastAPI
+├── auth.py              # JWT, хеширование паролей
+├── crud.py              # операции с БД
 ├── database.py          # подключение к PostgreSQL
+├── main.py              # точка входа FastAPI
 ├── models.py            # SQLAlchemy-модели
 ├── schemas.py           # Pydantic-схемы
-├── crud.py              # операции с БД
 └── routers/
-    ├── __init__.py
-    └── tasks.py         # маршруты API
+    ├── auth.py          # регистрация и логин
+    └── tasks.py         # маршруты задач
+
+alembic/
+├── env.py
+├── script.py.mako
+└── versions/
+    └── bfd731055e9c_initial.py
 
 tests/
-└── test_tasks.py        # тесты API
+└── test_tasks.py
 
 .github/
 └── workflows/
-    └── tests.yml        # GitHub Actions CI
+    └── tests.yml
 
 Dockerfile
 docker-compose.yml
+alembic.ini
 pytest.ini
 requirements.txt
 README.md
@@ -69,10 +100,81 @@ README.md
 
 | Метод | Endpoint | Описание |
 |---------|---------|---------|
-| GET | `/tasks` | Получить список задач |
+| POST | `/register` | Регистрация пользователя |
+| POST | `/login` | Получение JWT-токена |
+| GET | `/tasks` | Получить свои задачи |
 | POST | `/tasks` | Создать задачу |
 | PUT | `/tasks/{task_id}` | Закрыть задачу |
 | DELETE | `/tasks/{task_id}` | Удалить задачу |
+
+---
+
+## Authentication
+
+Для работы с маршрутом `/tasks` необходимо пройти аутентификацию.
+
+### Регистрация
+
+```http
+POST /register
+```
+
+Тело запроса:
+
+```json
+{
+  "username": "mustafa",
+  "password": "123456"
+}
+```
+
+---
+
+### Получение JWT-токена
+
+```http
+POST /login
+```
+
+Тело запроса:
+
+```json
+{
+  "username": "mustafa",
+  "password": "123456"
+}
+```
+
+Ответ:
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer"
+}
+```
+
+---
+
+### Swagger Authorize
+
+После получения JWT:
+
+1. Открыть Swagger UI.
+2. Нажать кнопку `Authorize`.
+3. Вставить полученный `access_token`.
+4. Выполнить авторизацию.
+
+После этого маршруты `/tasks` будут доступны.
+
+---
+
+## Безопасность
+
+- пароли пользователей хранятся в виде хешей;
+- аутентификация выполняется через JWT-токены;
+- защищённые маршруты требуют авторизации;
+- пользователь имеет доступ только к собственным задачам.
 
 ---
 
@@ -117,10 +219,22 @@ http://localhost:8000/redoc
 docker compose down
 ```
 
+Остановить контейнеры с удалением volumes:
+
+```bash
+docker compose down -v
+```
+
 Посмотреть работающие контейнеры:
 
 ```bash
 docker ps
+```
+
+Посмотреть логи:
+
+```bash
+docker compose logs -f
 ```
 
 ---
@@ -169,10 +283,50 @@ Host: localhost
 Port: 5432
 ```
 
+Применить миграции:
+
+```bash
+alembic upgrade head
+```
+
 Запустить приложение:
 
 ```bash
 uvicorn app.main:app --reload
+```
+
+---
+
+## Работа с миграциями
+
+Создать новую миграцию:
+
+```bash
+alembic revision --autogenerate -m "migration_name"
+```
+
+Применить миграции:
+
+```bash
+alembic upgrade head
+```
+
+Посмотреть текущую версию:
+
+```bash
+alembic current
+```
+
+История миграций:
+
+```bash
+alembic history
+```
+
+Откатить последнюю миграцию:
+
+```bash
+alembic downgrade -1
 ```
 
 ---
@@ -192,7 +346,8 @@ GET /tasks
   {
     "id": 1,
     "title": "Изучить FastAPI",
-    "is_closed": false
+    "is_closed": false,
+    "user_id": 1
   }
 ]
 ```
@@ -203,7 +358,6 @@ GET /tasks
 
 ```http
 POST /tasks
-Content-Type: application/json
 ```
 
 Тело запроса:
@@ -220,7 +374,8 @@ Content-Type: application/json
 {
   "id": 1,
   "title": "Изучить FastAPI",
-  "is_closed": false
+  "is_closed": false,
+  "user_id": 1
 }
 ```
 
@@ -238,7 +393,8 @@ PUT /tasks/1
 {
   "id": 1,
   "title": "Изучить FastAPI",
-  "is_closed": true
+  "is_closed": true,
+  "user_id": 1
 }
 ```
 
@@ -270,21 +426,23 @@ pytest
 
 Текущий набор тестов покрывает:
 
+- получение JWT-токена для доступа к API;
 - получение списка задач;
 - создание задачи;
 - закрытие задачи;
 - удаление задачи;
 - обработку отсутствующей задачи (404);
+- проверку авторизации;
 - валидацию входных данных (422).
 
 Пример результата:
 
 ```text
-collected 7 items
+collected 8 items
 
-tests/test_tasks.py .......
+tests/test_tasks.py ........
 
-7 passed
+8 passed
 ```
 
 ---
@@ -303,7 +461,7 @@ git push
 
 - установка зависимостей;
 - запуск PostgreSQL;
-- создание таблиц БД;
+- применение миграций Alembic;
 - запуск тестов Pytest.
 
 При успешном прохождении тестов workflow получает статус:
@@ -321,9 +479,14 @@ git push
 - разработка REST API на FastAPI;
 - работа с PostgreSQL;
 - использование SQLAlchemy ORM;
+- управление версиями схемы БД через Alembic;
+- JWT-аутентификация и авторизация пользователей;
+- хеширование паролей через Passlib;
+- разграничение доступа пользователей к данным;
 - валидация данных через Pydantic;
 - контейнеризация приложения с Docker;
 - настройка Docker Compose;
+- настройка Healthcheck в Docker Compose;
 - написание интеграционных тестов на Pytest;
 - документирование API через Swagger/OpenAPI;
 - организация проекта через routers, schemas и CRUD слой;
